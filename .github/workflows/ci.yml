@@ -61,5 +61,9 @@ jobs:
           if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
             throw 'Windows x64 binary is missing'
           }
-          & $exe --probe
-          if ($LASTEXITCODE -ne 0) { throw 'Read-only --probe failed' }
+          # This executable uses the Windows GUI subsystem. PowerShell does not
+          # wait for GUI processes launched with &, or set $LASTEXITCODE.
+          $process = Start-Process -FilePath (Resolve-Path -LiteralPath $exe).Path -ArgumentList '--probe' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Read-only --probe failed (exit code $($process.ExitCode))"
+          }

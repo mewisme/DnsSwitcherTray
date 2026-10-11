@@ -400,7 +400,7 @@ fn interactive_user() -> Result<String, String> {
     let mut size = 512u32;
     let mut buffer = vec![0u16; size as usize];
     let result = unsafe { GetUserNameExW(NameSamCompatible, buffer.as_mut_ptr(), &mut size) };
-    if result == 0 || size == 0 {
+    if !result || size == 0 {
         return Err("Could not identify the interactive Windows user.".into());
     }
     Ok(String::from_utf16_lossy(&buffer[..size as usize]))

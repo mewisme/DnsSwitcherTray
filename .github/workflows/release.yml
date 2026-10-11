@@ -1,0 +1,134 @@
+name: Release DnsSwitcherTray (Windows x64)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and package Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      APP_NAME: DnsSwitcherTray
+      TARGET: x86_64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify package and release version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $manifest = Get-Content Cargo.toml -Raw
+          if ($manifest -cnotmatch '(?m)^name\s*=\s*"DnsSwitcherTray"\s*$') {
+            throw 'Cargo package must be named DnsSwitcherTray'
+          }
+          if ($manifest -notmatch '(?m)^version\s*=\s*"([^"]+)"\s*$') {
+            throw 'Cargo package version was not found'
+          }
+          $version = $Matches[1]
+          if ($env:REF_TYPE -eq 'tag' -and $env:REF_NAME -cne "v$version") {
+            throw "Tag $env:REF_NAME must match Cargo.toml version v$version"
+          }
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: DnsSwitcherTray-windows-x64
+
+      - name: Build Windows x64 executable
+        run: |
+          cargo build --release --locked --target $env:TARGET
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo release build failed' }
+
+      - name: Package executable and checksums
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exeName = "$env:APP_NAME.exe"
+          $archiveName = "$env:APP_NAME-windows-x64.zip"
+          $builtExe = "target/$env:TARGET/release/$exeName"
+          if (-not (Test-Path -LiteralPath $builtExe -PathType Leaf)) {
+            throw "Expected executable not found: $builtExe"
+          }
+
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item -LiteralPath $builtExe -Destination "dist/$exeName"
+          Copy-Item -LiteralPath $builtExe -Destination $exeName
+          Copy-Item -LiteralPath README.md -Destination dist/README.md
+          Copy-Item -LiteralPath LICENSE -Destination dist/LICENSE
+
+          Compress-Archive -Path dist/* -DestinationPath $archiveName -Force
+
+          foreach ($file in @($exeName, $archiveName)) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or
+                (Get-Item -LiteralPath $file).Length -eq 0) {
+              throw "Missing or empty release asset: $file"
+            }
+            $sha = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            [System.IO.File]::WriteAllText(
+              "$file.sha256", "$sha  $file`n", [System.Text.Encoding]::ASCII
+            )
+          }
+
+      - name: Upload Windows x64 release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: DnsSwitcherTray-windows-x64
+          if-no-files-found: error
+          path: |
+            DnsSwitcherTray.exe
+            DnsSwitcherTray.exe.sha256
+            DnsSwitcherTray-windows-x64.zip
+            DnsSwitcherTray-windows-x64.zip.sha256
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows x64 release files
+        uses: actions/download-artifact@v4
+        with:
+          name: DnsSwitcherTray-windows-x64
+
+      - name: Verify checksums and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          sha256sum --check DnsSwitcherTray.exe.sha256
+          sha256sum --check DnsSwitcherTray-windows-x64.zip.sha256
+
+          gh release create "$TAG" \
+            DnsSwitcherTray.exe \
+            DnsSwitcherTray.exe.sha256 \
+            DnsSwitcherTray-windows-x64.zip \
+            DnsSwitcherTray-windows-x64.zip.sha256 \
+            --title "DnsSwitcherTray $TAG" \
+            --generate-notes \
+            --verify-tag

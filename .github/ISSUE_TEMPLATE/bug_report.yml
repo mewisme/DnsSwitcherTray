@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a reproducible non-security issue with DNS Switcher Tray.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, **do not file a public issue**. Use [private vulnerability reporting](https://github.com/mewisme/DnsSwitcherTray/security/advisories/new).
+        Remove passwords, tokens, public IPs, device identifiers, and other sensitive information from logs and screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      description: Release version or commit hash.
+      placeholder: "v0.0.1"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Include Windows 10/11, edition, and build number.
+      placeholder: "Windows 11 24H2 (build 26100)"
+    validations:
+      required: true
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: Network adapter type
+      options:
+        - Ethernet
+        - Wi-Fi
+        - VPN / virtual adapter
+        - Other / unknown
+    validations:
+      required: true
+  - type: input
+    id: dns_profile
+    attributes:
+      label: DNS profile
+      description: Profile selected, or Automatic (DHCP).
+      placeholder: "Cloudflare / Automatic (DHCP)"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open tray menu...
+        2. Select adapter...
+        3. Select profile...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Optional. Redact secrets, IP addresses, usernames, device identifiers, and other personal or network details before posting.
+      render: text
+    validations:
+      required: false

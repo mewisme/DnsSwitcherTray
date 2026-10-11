@@ -1,0 +1,10 @@
+# Standalone Rust application build output
+/target/
+/dist/
+
+# Windows build artifacts
+*.pdb
+*.ilk
+*.exe
+
+# Keep Cargo.lock tracked for reproducible application builds.

@@ -1,0 +1,13 @@
+# Keep source readable across Windows/Linux contributors.
+* text=auto
+*.rs text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+# Do not rewrite embedded icon and screenshots.
+*.ico binary
+*.png binary

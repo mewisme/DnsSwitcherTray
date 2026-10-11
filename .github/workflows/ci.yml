@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    name: Build and test Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: |
+          cargo fmt --check
+          if ($LASTEXITCODE -ne 0) { throw 'Rust formatting check failed' }
+
+      - name: Clippy
+        run: |
+          cargo clippy --all-targets --locked --target x86_64-pc-windows-msvc -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Clippy check failed' }
+
+      - name: Read-only Windows tests
+        run: |
+          cargo test --locked --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Rust tests failed' }
+
+      - name: Build Windows x64 release
+        run: |
+          cargo build --release --locked --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
+
+      - name: Safe executable smoke test
+        run: |
+          $exe = 'target/x86_64-pc-windows-msvc/release/DnsSwitcherTray.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+            throw 'Windows x64 binary is missing'
+          }
+          & $exe --probe
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only --probe failed' }
